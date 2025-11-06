@@ -6,9 +6,16 @@ import '../config/app_environment_service.dart';
 import 'interceptors/api_interceptor.dart';
 import 'interceptors/token_interceptor.dart';
 
+// --- UPDATED ALICE INITIALIZATION ---
 /// Global Alice instance for in-app network inspection.
 /// Exported so the host app can attach its navigatorKey.
-final Alice alice = Alice(showNotification: kDebugMode, showInspectorOnShake: kDebugMode);
+final Alice alice = Alice(
+  configuration: AliceConfiguration(
+    showNotification: kDebugMode,
+    showInspectorOnShake: kDebugMode,
+    notificationIcon: '@mipmap/ic_launcher', // Default notification icon
+  ),
+);
 
 /// Manages the central Dio instance, including its configuration,
 /// interceptors, and dynamic properties like the base URL.
@@ -27,19 +34,15 @@ class DioClient {
     );
     _dio = Dio(options);
 
-    // Add a listener to react to runtime base URL changes.
     _envService.baseUrlNotifier.addListener(_onBaseUrlChanged);
 
-    // Add interceptors in a specific order.
     _dio.interceptors.addAll([
-      // A custom interceptor to handle unified error transformation and headers.
       ApiInterceptor(),
-      // An interceptor to handle automatic token refresh logic.
-      TokenInterceptor(_dio), // Assumes TokenInterceptor needs Dio for retries.
+      TokenInterceptor(_dio),
       
-      // Debug-only interceptors.
       if (kDebugMode) ...[
-        alice.getDioInterceptor(),
+        // --- UPDATED INTERCEPTOR USAGE ---
+        alice.dioInterceptor, // Use the getter instead of the method
         PrettyDioLogger(
           requestHeader: true,
           requestBody: true,
@@ -53,20 +56,13 @@ class DioClient {
     ]);
   }
 
-  /// The fully configured Dio instance.
   Dio get dio => _dio;
 
-  /// Callback function to update the Dio instance's base URL when the
-  /// environment service notifies of a change.
   void _onBaseUrlChanged() {
-    final newBaseUrl = _envService.baseUrl;
-    if (_dio.options.baseUrl != newBaseUrl) {
-      _dio.options.baseUrl = newBaseUrl;
-      debugPrint('[DioClient] Dio baseUrl has been reconfigured to: $newBaseUrl');
-    }
+    _dio.options.baseUrl = _envService.baseUrl;
+    debugPrint('[DioClient] Dio baseUrl has been reconfigured to: ${_dio.options.baseUrl}');
   }
 
-  /// Cleans up resources, like removing the listener.
   void dispose() {
     _envService.baseUrlNotifier.removeListener(_onBaseUrlChanged);
   }
