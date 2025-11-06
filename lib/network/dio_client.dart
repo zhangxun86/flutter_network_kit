@@ -6,31 +6,25 @@ import '../config/app_environment_service.dart';
 import 'interceptors/api_interceptor.dart';
 import 'interceptors/token_interceptor.dart';
 
-// --- UPDATED ALICE INITIALIZATION ---
+// --- CORRECT ALICE v1.0.0 INITIALIZATION ---
 /// Global Alice instance for in-app network inspection.
-/// Exported so the host app can attach its navigatorKey.
-final Alice alice = Alice(
-  configuration: AliceConfiguration(
-    showNotification: kDebugMode,
-    showInspectorOnShake: kDebugMode,
-    notificationIcon: '@mipmap/ic_launcher', // Default notification icon
-  ),
-);
+final Alice alice = Alice();
 
-/// Manages the central Dio instance, including its configuration,
-/// interceptors, and dynamic properties like the base URL.
+/// Manages the central Dio instance.
 class DioClient {
   final AppEnvironmentService _envService;
   late final Dio _dio;
 
   DioClient(this._envService) {
+    // --- CONFIGURE ALICE INSTANCE AFTER CREATION ---
+    alice.showNotification = kDebugMode;
+    alice.showInspectorOnShake = kDebugMode;
+    
     final options = BaseOptions(
       baseUrl: _envService.baseUrl,
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers: {'Accept': 'application/json'},
     );
     _dio = Dio(options);
 
@@ -41,8 +35,8 @@ class DioClient {
       TokenInterceptor(_dio),
       
       if (kDebugMode) ...[
-        // --- UPDATED INTERCEPTOR USAGE ---
-        alice.dioInterceptor, // Use the getter instead of the method
+        // --- CORRECT INTERCEPTOR USAGE ---
+        alice.getDioInterceptor(), // It IS a method, not a getter.
         PrettyDioLogger(
           requestHeader: true,
           requestBody: true,
