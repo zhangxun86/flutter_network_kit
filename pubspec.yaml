@@ -4,7 +4,7 @@ version: 1.0.0
 homepage: https://github.com/zhangxun86/flutter_network_kit
 
 environment:
-  sdk: ^3.10.0-162.1.beta
+  sdk: '>=3.2.0 <4.0.0'
   flutter: ">=1.17.0"
 
 dependencies:
