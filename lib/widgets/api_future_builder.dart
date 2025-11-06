@@ -16,7 +16,7 @@ class ApiFutureBuilder<T> extends StatelessWidget {
   
   /// A custom builder function for the error state, providing the error message.
   /// Defaults to a centered red text widget displaying the message.
-  final Widget Function(BuildContext- context, String errorMessage)? errorBuilder;
+  final Widget Function(BuildContext context, String errorMessage)? errorBuilder;
 
   const ApiFutureBuilder({
     super.key,
