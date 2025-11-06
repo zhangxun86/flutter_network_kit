@@ -1,4 +1,3 @@
-import 'package:alice/alice.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
@@ -6,17 +5,15 @@ import '../config/app_environment_service.dart';
 import 'interceptors/api_interceptor.dart';
 import 'interceptors/token_interceptor.dart';
 
-// --- CORRECT ALICE v1.0.0 FINAL IMPLEMENTATION ---
-
-/// Global Alice instance for in-app network inspection.
-final Alice alice = Alice();
-
-/// Manages the central Dio instance.
 class DioClient {
   final AppEnvironmentService _envService;
   late final Dio _dio;
 
-  DioClient(this._envService) {
+  /// The constructor now accepts an optional list of extra interceptors.
+  /// This allows the host application to inject its own interceptors,
+  /// such as a network inspector like Alice, without the library needing
+  /// to know about them directly.
+  DioClient(this._envService, {List<Interceptor>? extraInterceptors}) {
     final options = BaseOptions(
       baseUrl: _envService.baseUrl,
       connectTimeout: const Duration(seconds: 15),
@@ -27,16 +24,12 @@ class DioClient {
 
     _envService.baseUrlNotifier.addListener(_onBaseUrlChanged);
 
-    // Add interceptors in a specific order.
     _dio.interceptors.addAll([
       ApiInterceptor(),
       TokenInterceptor(_dio),
       
       if (kDebugMode) ...[
-        // For Alice v1.0.0, the interceptor is accessed via the `getDioAdapter()` method.
-        // Note: The original documentation might be slightly off. It's an adapter that acts as an interceptor.
-        alice.getDioAdapter(),
-        
+        // The console logger remains as a default debug tool.
         PrettyDioLogger(
           requestHeader: true,
           requestBody: true,
@@ -46,7 +39,10 @@ class DioClient {
           compact: true,
           maxWidth: 90,
         ),
-      ]
+      ],
+      
+      // If the host application provides extra interceptors, add them here.
+      if (extraInterceptors != null) ...extraInterceptors,
     ]);
   }
 
