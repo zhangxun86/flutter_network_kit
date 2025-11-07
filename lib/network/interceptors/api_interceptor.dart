@@ -12,58 +12,51 @@ class ApiInterceptor extends Interceptor {
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     if (response.data is Map<String, dynamic>) {
       final Map<String, dynamic> data = response.data;
-      
       if (data.containsKey('code')) {
         final int code = data['code'];
-        
         if (code == 0) {
-          // --- SUCCESS CASE ---
-          // Only proceed if 'data' field also exists for successful responses.
           if (data.containsKey('data')) {
             response.data = data['data'];
           }
-          // If 'data' field is null or absent, it will pass through as is, 
-          // which might be null. This is acceptable.
           return super.onResponse(response, handler);
         } else {
-          // --- BUSINESS ERROR CASE ---
           final String msg = data['msg'] ?? 'Unknown business error';
-          // Create a DioException to be caught by the onError handler.
           final error = DioException(
             requestOptions: response.requestOptions,
             response: response,
             type: DioExceptionType.badResponse,
-            error: ApiException( // Pre-populate the error with our custom exception
+            error: ApiException(
               message: msg,
               code: code,
               requestOptions: response.requestOptions,
               response: response,
             ),
           );
-          // Reject the response, which will trigger the onError callback.
           return handler.reject(error);
         }
       }
     }
-    // If the response format is not our standard, pass it through.
     super.onResponse(response, handler);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // If the error is already an ApiException (from our onResponse logic),
-    // we just need to ensure it's properly wrapped in a DioException.
-    if (err.error is! ApiException) {
-      // If not, we create one. This handles network errors, timeouts, etc.
-      final ApiException apiException = _createApiException(err);
-      // Replace the original error with our custom ApiException.
-      err.error = apiException;
+    if (err.error is ApiException) {
+      return handler.next(err);
     }
-    
-    super.onError(err, handler);
+
+    final ApiException apiException = _createApiException(err);
+
+    final newError = DioException(
+      requestOptions: err.requestOptions,
+      response: err.response,
+      type: err.type,
+      error: apiException,
+    );
+
+    return handler.next(newError);
   }
 
-  // Helper method to create ApiException from DioException
   ApiException _createApiException(DioException err) {
     switch (err.type) {
       case DioExceptionType.connectionTimeout:
@@ -80,7 +73,18 @@ class ApiInterceptor extends Interceptor {
           requestOptions: err.requestOptions,
           response: err.response,
         );
-      // ... handle other cases
+      case DioExceptionType.connectionError:
+        return ApiException(
+          message: "Connection error. Please check your network.",
+          requestOptions: err.requestOptions,
+        );
+      case DioExceptionType.cancel:
+        // This is not a user-facing error. We can create a silent exception
+        // or handle it differently if needed. For now, a generic message.
+        return ApiException(
+          message: "Request was cancelled.",
+          requestOptions: err.requestOptions,
+        );
       default:
         return ApiException(
           message: "An unknown network error occurred.",
