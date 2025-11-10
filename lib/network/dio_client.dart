@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package.flutter/foundation.dart';
-import 'package.pretty_dio_logger/pretty_dio_logger.dart';
+import 'package:flutter/foundation.dart';
+import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../config/app_environment_service.dart';
 import 'interceptors/api_interceptor.dart';
 import 'interceptors/token_interceptor.dart';
