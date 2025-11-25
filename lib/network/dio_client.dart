@@ -18,8 +18,12 @@ class DioClient {
   late final Dio _dio;
 
   /// The constructor accepts an optional list of `extraInterceptors`.
-  /// These are applied after the library's core interceptors but before
-  /// the debug-only loggers.
+  ///
+  /// [Modification Note]:
+  /// `extraInterceptors` are now added FIRST. This ensures that they are the "outermost"
+  /// layer of the onion model. If `ApiInterceptor` (inner layer) detects a business error
+  /// (like 8001) and rejects the request, the error bubbles up to these outer interceptors,
+  /// allowing `TokenExpirationInterceptor` to catch it in its `onError` method.
   DioClient(this._envService, {List<Interceptor>? extraInterceptors}) {
     final options = BaseOptions(
       baseUrl: _envService.baseUrl,
@@ -32,19 +36,21 @@ class DioClient {
     // Add a listener to react to runtime base URL changes.
     _envService.baseUrlNotifier.addListener(_onBaseUrlChanged);
 
-    // Add interceptors in a specific, logical order.
+    // Add interceptors in a specific, logical order for correct error handling.
     _dio.interceptors.addAll([
-      // 1. Core interceptor for standardized API response processing and error transformation.
+      // 1. Application-specific interceptors (e.g., TokenExpirationInterceptor).
+      //    Added FIRST so they can catch errors thrown by interceptors added later.
+      if (extraInterceptors != null) ...extraInterceptors,
+
+      // 2. Core interceptor for standardized API response processing and error transformation.
+      //    If this detects code 8001, it throws an exception, which bubbles up to #1.
       ApiInterceptor(),
       
-      // 2. Core interceptor for handling authentication token logic.
+      // 3. Core interceptor for handling authentication token logic (headers).
       TokenInterceptor(_dio),
       
-      // 3. Application-specific interceptors are injected here.
-      //    This is the primary extension point for the host app.
-      if (extraInterceptors != null) ...extraInterceptors,
-      
-      // 4. Debug-only logger, added last to log the final state of the request.
+      // 4. Debug-only logger.
+      //    Added LAST to be closest to the network, logging the rawest form of data.
       if (kDebugMode)
         PrettyDioLogger(
           requestHeader: true,
