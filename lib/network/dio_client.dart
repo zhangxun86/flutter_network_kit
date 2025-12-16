@@ -4,6 +4,7 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../config/app_environment_service.dart';
 import 'interceptors/api_interceptor.dart';
 import 'interceptors/token_interceptor.dart';
+import 'interfaces/token_provider.dart';
 
 /// Manages the central Dio instance, including its configuration and interceptors.
 ///
@@ -15,6 +16,7 @@ import 'interceptors/token_interceptor.dart';
 /// common parameter injectors, network inspectors (like Alice), or custom loggers.
 class DioClient {
   final AppEnvironmentService _envService;
+  final TokenProvider _tokenProvider;
   late final Dio _dio;
 
   /// The constructor accepts an optional list of `extraInterceptors`.
@@ -23,8 +25,12 @@ class DioClient {
   /// `extraInterceptors` are now added FIRST. This ensures that they are the "outermost"
   /// layer of the onion model. If `ApiInterceptor` (inner layer) detects a business error
   /// (like 8001) and rejects the request, the error bubbles up to these outer interceptors,
-  /// allowing `TokenExpirationInterceptor` to catch it in its `onError` method.
-  DioClient(this._envService, {List<Interceptor>? extraInterceptors}) {
+  /// allowing `TokenInterceptor` to catch it in its `onError` method.
+  DioClient(
+      this._envService,
+      this._tokenProvider, {
+        List<Interceptor>? extraInterceptors,
+      }) {
     final options = BaseOptions(
       baseUrl: _envService.baseUrl,
       connectTimeout: const Duration(seconds: 15),
@@ -38,17 +44,18 @@ class DioClient {
 
     // Add interceptors in a specific, logical order for correct error handling.
     _dio.interceptors.addAll([
-      // 1. Application-specific interceptors (e.g., TokenExpirationInterceptor).
+      // 1. Application-specific interceptors (e.g., specific logging or headers).
       //    Added FIRST so they can catch errors thrown by interceptors added later.
       if (extraInterceptors != null) ...extraInterceptors,
 
       // 2. Core interceptor for standardized API response processing and error transformation.
       //    If this detects code 8001, it throws an exception, which bubbles up to #1.
       ApiInterceptor(),
-      
+
       // 3. Core interceptor for handling authentication token logic (headers).
-      TokenInterceptor(_dio),
-      
+      //    Now uses the injected TokenProvider implementation.
+      TokenInterceptor(_dio, _tokenProvider),
+
       // 4. Debug-only logger.
       //    Added LAST to be closest to the network, logging the rawest form of data.
       if (kDebugMode)

@@ -1,17 +1,19 @@
 import 'package:dio/dio.dart';
+import '../interfaces/token_provider.dart'; // 确保路径正确
 
-/// Interceptor that handles automatic token refreshing using the queueing mechanism.
 class TokenInterceptor extends QueuedInterceptor {
   final Dio _dio;
+  final TokenProvider _tokenProvider; // 新增
 
-  TokenInterceptor(this._dio);
+  TokenInterceptor(this._dio, this._tokenProvider);
 
   @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // final String? accessToken = await AuthService.getAccessToken();
-    // if (accessToken != null) {
-    //   options.headers['Authorization'] = 'Bearer $accessToken';
-    // }
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    // 动态获取 Token
+    final String? accessToken = await _tokenProvider.getAccessToken();
+    if (accessToken != null) {
+      options.headers['Authorization'] = 'Bearer $accessToken';
+    }
     super.onRequest(options, handler);
   }
 
@@ -19,35 +21,25 @@ class TokenInterceptor extends QueuedInterceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
       try {
-        // No need to call dio.lock() anymore.
-        // The handler will queue subsequent requests automatically.
-        
-        // Perform the token refresh logic.
-        // final bool success = await AuthService.refreshToken();
-        final bool success = true; // Placeholder for success
+        // 调用外部传入的刷新逻辑
+        final bool success = await _tokenProvider.refreshToken();
 
         if (success) {
-          // Fetch the new token.
-          // final String newAccessToken = await AuthService.getAccessToken();
-          const String newAccessToken = "new_dummy_token"; // Placeholder
+          // 刷新成功，获取新 Token
+          final String? newAccessToken = await _tokenProvider.getAccessToken();
 
-          // Update the header of the failed request.
-          final requestOptions = err.requestOptions;
-          requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
-
-          // Retry the request with the new token.
-          final response = await _dio.fetch(requestOptions);
-
-          // When the request is resolved, the handler will unlock the queue
-          // and process the pending requests.
-          return handler.resolve(response);
+          if (newAccessToken != null) {
+            // 更新 header 并重试
+            final requestOptions = err.requestOptions;
+            requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+            final response = await _dio.fetch(requestOptions);
+            return handler.resolve(response);
+          }
         }
       } catch (e) {
-        // If refresh fails, reject the error and the queue will be unlocked with an error.
         return handler.reject(err);
       }
     }
-    // For other errors, just pass them along.
     super.onError(err, handler);
   }
 }
