@@ -44,6 +44,18 @@ class DioClient {
 
     // Add interceptors in a specific, logical order for correct error handling.
     _dio.interceptors.addAll([
+      // 0. Debug-only logger.
+      //    Added LAST to be closest to the network, logging the rawest form of data.
+      if (kDebugMode)
+        PrettyDioLogger(
+          requestHeader: true,
+          requestBody: true,
+          responseBody: true,
+          responseHeader: false,
+          error: true,
+          compact: true,
+          maxWidth: 90,
+        ),
       // 1. Application-specific interceptors (e.g., specific logging or headers).
       //    Added FIRST so they can catch errors thrown by interceptors added later.
       if (extraInterceptors != null) ...extraInterceptors,
@@ -56,18 +68,7 @@ class DioClient {
       //    Now uses the injected TokenProvider implementation.
       TokenInterceptor(_dio, _tokenProvider),
 
-      // 4. Debug-only logger.
-      //    Added LAST to be closest to the network, logging the rawest form of data.
-      if (kDebugMode)
-        PrettyDioLogger(
-          requestHeader: true,
-          requestBody: true,
-          responseBody: true,
-          responseHeader: false,
-          error: true,
-          compact: true,
-          maxWidth: 90,
-        ),
+
     ]);
   }
 
